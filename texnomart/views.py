@@ -48,16 +48,19 @@ def logout_view(request):
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
 
+
+
 class ProductListPagination(PageNumberPagination):
     page_size = 100
     page_size_query_param = 'page_size'
     max_page_size = 100
 
-class ProductListView(APIView):
+
+class ProductListView(generics.ListAPIView):
     permission_classes = [IsAdminOrReadOnly]
-    pagination_class = ProductListPagination
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    pagination_class = ProductListPagination
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = ProductFilter
     search_fields = ['name', 'category__name']
@@ -67,21 +70,20 @@ class ProductListView(APIView):
         products = cache.get(cache_key)
 
         if not products:
-            queryset = Product.objects.all()
+            queryset = self.filter_queryset(self.get_queryset())
             paginator = self.pagination_class()
             page = paginator.paginate_queryset(queryset, request)
-            serializer = ProductSerializer(page, many=True)
+            serializer = self.get_serializer(page, many=True)
             products = serializer.data
             cache.set(cache_key, products, timeout=60)
             return paginator.get_paginated_response(products)
 
         paginator = self.pagination_class()
-        page = paginator.paginate_queryset(Product.objects.all(), request)
+        page = paginator.paginate_queryset(self.queryset, request)
         return paginator.get_paginated_response(products)
 
 
-
-class CategoryListView(APIView):
+class CategoryListView(generics.ListAPIView):
     permission_classes = [IsAdminOrReadOnly]
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -93,11 +95,12 @@ class CategoryListView(APIView):
         cache_key = 'category_list'
         categories = cache.get(cache_key)
         if not categories:
-            queryset = Category.objects.all()
-            serializer = CategorySerializer(queryset, many=True)
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
             categories = serializer.data
             cache.set(cache_key, categories, timeout=60)
         return Response(categories)
+
 
 class ProductDetailView(generics.RetrieveAPIView):
     queryset = Product.objects.all()
